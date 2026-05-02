@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ClauDJ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+<link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, 'Inter', sans-serif;
+  /* Simulated desktop wallpaper behind the widget */
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 30%, #1a0a3a 0%, transparent 60%),
+    radial-gradient(ellipse 70% 80% at 80% 70%, #0a1f3a 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 50% 50%, #0d0d1a 0%, transparent 80%),
+    linear-gradient(135deg, #08081a 0%, #0f0a1f 40%, #0a1520 100%);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Wallpaper blobs for depth */
+.wp-blob {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+}
+.wp-b1 { width: 600px; height: 600px; top: -100px; left: -100px; background: radial-gradient(circle, rgba(120,60,200,0.35) 0%, transparent 70%); }
+.wp-b2 { width: 500px; height: 500px; bottom: -80px; right: -80px; background: radial-gradient(circle, rgba(40,100,200,0.3) 0%, transparent 70%); }
+.wp-b3 { width: 400px; height: 400px; top: 40%; left: 40%; background: radial-gradient(circle, rgba(200,80,120,0.12) 0%, transparent 70%); }
+
+/* ── THE WIDGET ── */
+.widget {
+  width: 360px;
+  border-radius: 28px;
+  position: relative;
+  cursor: default;
+  user-select: none;
+
+  /* Fluid glass effect */
+  background:
+    linear-gradient(160deg,
+      rgba(255,255,255,0.18) 0%,
+      rgba(255,255,255,0.06) 30%,
+      rgba(255,255,255,0.04) 60%,
+      rgba(255,255,255,0.10) 100%
+    );
+  backdrop-filter: blur(48px) saturate(1.8) brightness(1.05);
+  -webkit-backdrop-filter: blur(48px) saturate(1.8) brightness(1.05);
+
+  /* Refractive border */
+  border: 1px solid rgba(255,255,255,0.28);
+  box-shadow:
+    /* outer glow */
+    0 0 0 0.5px rgba(255,255,255,0.08),
+    /* main shadow */
+    0 32px 80px rgba(0,0,0,0.55),
+    0 8px 24px rgba(0,0,0,0.35),
+    /* inner top specular */
+    inset 0 1.5px 0 rgba(255,255,255,0.45),
+    /* inner bottom edge */
+    inset 0 -1px 0 rgba(255,255,255,0.08),
+    /* inner left specular */
+    inset 1px 0 0 rgba(255,255,255,0.15);
+
+  overflow: hidden;
+}
+
+/* Glass refraction overlay */
+.widget::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  background: linear-gradient(
+    160deg,
+    rgba(255,255,255,0.12) 0%,
+    rgba(255,255,255,0.0) 25%,
+    rgba(255,255,255,0.0) 75%,
+    rgba(255,255,255,0.06) 100%
+  );
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Top specular shine */
+.widget::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 20px; right: 20px;
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.7) 30%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0.7) 70%, transparent);
+  border-radius: 999px;
+  z-index: 11;
+}
+
+/* ── Title bar ── */
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  position: relative;
+  z-index: 5;
+}
+.traffic-lights { display: flex; gap: 6px; flex-shrink: 0; }
+.tl {
+  width: 12px; height: 12px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px; color: transparent; transition: color 0.15s;
+  cursor: pointer;
+}
+.tl:hover { color: rgba(0,0,0,0.5); }
+.tl-close { background: #ff5f57; border: 0.5px solid rgba(0,0,0,0.15); }
+.tl-min   { background: #febc2e; border: 0.5px solid rgba(0,0,0,0.12); }
+.tl-max   { background: #28c840; border: 0.5px solid rgba(0,0,0,0.12); }
+.title-text {
+  flex: 1; text-align: center; font-size: 13px; font-weight: 500;
+  color: rgba(255,255,255,0.75); letter-spacing: 0.01em;
+  margin-right: 46px; /* offset for traffic lights */
+}
+
+/* ── Content area ── */
+.content { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+/* ── Glass panels (inner cards) ── */
+.panel {
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg,
+      rgba(255,255,255,0.13) 0%,
+      rgba(255,255,255,0.05) 50%,
+      rgba(255,255,255,0.08) 100%
+    );
+  border: 1px solid rgba(255,255,255,0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.3),
+    inset 0 -0.5px 0 rgba(255,255,255,0.06),
+    0 4px 16px rgba(0,0,0,0.25);
+  overflow: hidden;
+  position: relative;
+}
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* ── Now Playing ── */
+.now-playing { padding: 14px 16px; }
+.np-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.np-art {
+  width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0;
+  position: relative; overflow: hidden;
+  background: linear-gradient(135deg, rgba(140,60,220,0.6), rgba(60,120,220,0.5));
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+  display: flex; align-items: center; justify-content: center;
+}
+.np-art-vinyl {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: conic-gradient(from 0deg, #1a1a2e, #2d2d4a, #1a1a2e, #2d2d4a);
+  box-shadow: 0 0 0 6px rgba(255,255,255,0.06), 0 0 0 10px rgba(255,255,255,0.03);
+  display: flex; align-items: center; justify-content: center;
+}
+.np-art-vinyl::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.8); }
+.np-info { flex: 1; min-width: 0; }
+.np-title { font-size: 15px; font-weight: 600; color: rgba(255,255,255,0.95); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
+.np-artist { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+.np-time-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 999px;
+  background: rgba(255,255,255,0.1); border: 0.5px solid rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.6); flex-shrink: 0;
+}
+
+/* Progress */
+.np-progress { margin-bottom: 10px; }
+.np-bar-track {
+  height: 3px; background: rgba(255,255,255,0.12); border-radius: 99px;
+  cursor: pointer; position: relative;
+}
+.np-bar-fill {
+  height: 100%; border-radius: 99px; position: relative;
+  transition: width 0.4s linear;
+}
+.np-bar-fill::after {
+  content: ''; position: absolute; right: -4px; top: -3px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: white; box-shadow: 0 0 6px rgba(255,255,255,0.6);
+  opacity: 0; transition: opacity 0.2s;
+}
+.np-bar-track:hover .np-bar-fill::after { opacity: 1; }
+.np-times { display: flex; justify-content: space-between; margin-top:5px; font-size: 10px; color: rgba(255,255,255,0.35); font-variant-numeric: tabular-nums; }
+
+/* Controls */
+.np-controls { display: flex; align-items: center; justify-content: center; gap: 20px; }
+.ctrl-btn {
+  border: none; background: none; cursor: pointer; color: rgba(255,255,255,0.55);
+  font-size: 18px; display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 50%;
+  transition: color 0.15s, background 0.15s;
+}
+.ctrl-btn:hover { color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.08); }
+.ctrl-play {
+  width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer;
+  font-size: 20px; display: flex; align-items: center; justify-content: center;
+  position: relative; transition: transform 0.15s, opacity 0.15s;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.ctrl-play:hover { transform: scale(1.05); }
+.ctrl-play:active { transform: scale(0.96); }
+
+/* ── Waveform mini ── */
+.waveform { display: flex; align-items: center; gap: 2px; height: 16px; }
+.wv { width: 2.5px; border-radius: 99px; background: rgba(255,255,255,0.3); transition: background 0.3s; }
+.wv.active { background: rgba(255,255,255,0.8); animation: wvpulse 1s ease-in-out infinite alternate; }
+@keyframes wvpulse { 0% { height: 3px; opacity: 0.5; } 100% { height: 14px; opacity: 1; } }
+
+/* ── Day Arc / Schedule ── */
+.day-arc { padding: 14px 16px; }
+.da-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.da-title { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: rgba(255,255,255,0.4); }
+.da-date { font-size: 11px; color: rgba(255,255,255,0.3); }
+
+/* Timeline */
+.timeline { position: relative; margin-bottom: 14px; }
+.tl-track {
+  height: 6px; border-radius: 99px; overflow: hidden;
+  background: rgba(255,255,255,0.08);
+  display: flex;
+}
+.tl-seg {
+  height: 100%; transition: flex 0.5s;
+  position: relative;
+}
+.tl-now-marker {
+  position: absolute; top: -4px; bottom: -4px; width: 2px; border-radius: 99px;
+  background: white; box-shadow: 0 0 8px rgba(255,255,255,0.8);
+  transform: translateX(-50%);
+  z-index: 5;
+}
+
+/* Slots */
+.slots { display: flex; flex-direction: column; gap: 6px; }
+.slot {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border-radius: 12px; transition: background 0.2s; cursor: default;
+}
+.slot.current {
+  background: rgba(255,255,255,0.1);
+  border: 0.5px solid rgba(255,255,255,0.2);
+}
+.slot-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.slot.current .slot-dot { box-shadow: 0 0 6px currentColor; }
+.slot-time { font-size: 11px; color: rgba(255,255,255,0.35); font-variant-numeric: tabular-nums; width: 38px; flex-shrink: 0; }
+.slot-info { flex: 1; min-width: 0; }
+.slot-label { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); }
+.slot-mood { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 1px; }
+.slot-badge {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px; flex-shrink: 0;
+}
+
+/* ── Chat pill ── */
+.chat-pill-wrap { padding: 0 0 4px; }
+.chat-pill-btn {
+  width: 100%; border: none; cursor: pointer; border-radius: 14px; padding: 11px 14px;
+  display: flex; align-items: center; gap: 10px; text-align: left;
+  background: rgba(255,255,255,0.07); border: 0.5px solid rgba(255,255,255,0.14);
+  transition: background 0.2s, border-color 0.2s;
+  font-family: inherit;
+}
+.chat-pill-btn:hover { background: rgba(255,255,255,0.11); border-color: rgba(255,255,255,0.22); }
+.chat-pill-icon { font-size: 14px; opacity: 0.5; flex-shrink: 0; }
+.chat-pill-text { font-size: 13px; color: rgba(255,255,255,0.38); flex: 1; }
+.chat-pill-hint { font-size: 10px; color: rgba(255,255,255,0.22); flex-shrink: 0; }
+
+/* Chat expanded */
+.chat-expanded { display: flex; flex-direction: column; gap: 10px; }
+.chat-msgs { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; padding: 2px 2px; }
+.chat-msgs::-webkit-scrollbar { width: 0; }
+.cmsg { font-size: 13px; line-height: 1.55; max-width: 88%; }
+.cmsg.dj { color: rgba(255,255,255,0.75); align-self: flex-start; font-style: italic; }
+.cmsg.user {
+  align-self: flex-end; color: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.1); border: 0.5px solid rgba(255,255,255,0.18);
+  padding: 7px 12px; border-radius: 12px; border-bottom-right-radius: 4px;
+  font-style: normal;
+}
+.chat-row { display: flex; gap: 8px; align-items: center; }
+.chat-input-inner {
+  flex: 1; background: rgba(255,255,255,0.08); border: 0.5px solid rgba(255,255,255,0.15);
+  border-radius: 10px; padding: 8px 12px; color: rgba(255,255,255,0.9);
+  font-size: 13px; font-family: inherit; outline: none; resize: none;
+  transition: border-color 0.2s; min-height: 36px; max-height: 80px;
+}
+.chat-input-inner:focus { border-color: rgba(255,255,255,0.3); }
+.chat-input-inner::placeholder { color: rgba(255,255,255,0.25); }
+.send-btn {
+  width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 600; flex-shrink: 0;
+  transition: opacity 0.2s; color: #fff;
+}
+.send-btn:hover { opacity: 0.85; }
+
+/* ── Typing dots ── */
+.typing-dots { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+.td { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.4); animation: tdbounce 1s ease-in-out infinite; }
+@keyframes tdbounce { 0%,80%,100%{transform:scale(0.7);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+
+/* ── Spinning vinyl art ── */
+.spinning { animation: spin 4s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Calendar connect notice ── */
+.cal-notice {
+  display: flex; align-items: center; gap: 8px; padding: 9px 12px;
+  border-radius: 12px; background: rgba(255,200,60,0.08);
+  border: 0.5px solid rgba(255,200,60,0.25);
+}
+.cal-icon { font-size: 14px; flex-shrink: 0; }
+.cal-text { font-size: 11px; color: rgba(255,255,255,0.5); flex: 1; line-height: 1.4; }
+.cal-link { font-size: 11px; color: rgba(255,200,60,0.8); font-weight: 500; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+.cal-link:hover { color: rgba(255,220,80,1); }
+
+/* ── Divider ── */
+.divider { height: 0.5px; background: rgba(255,255,255,0.1); margin: 0 16px; }
+
+/* fade in */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.fadein { animation: fadeIn 0.4s ease both; }
+</style>
+</head>
+<body>
+
+<div class="wp-blob wp-b1"></div>
+<div class="wp-blob wp-b2"></div>
+<div class="wp-blob wp-b3"></div>
+
+<div id="root"></div>
+
+<script type="text/babel">
+
+// ─── Data & Time Logic ────────────────────────────────────────────────────────
+
+const TIME_SLOTS = [
+  {
+    id: 'morning', label: 'Morning', icon: '🌅',
+    start: 6, end: 9, color: '#f8a84b',
+    mood: 'Calm & peaceful', genre: 'Ambient · Acoustic · Soft piano',
+    desc: 'Gentle start to the day',
+    tracks: [
+      { title: 'Weightless', artist: 'Marconi Union', duration: 247 },
+      { title: 'Morning Phase', artist: 'Beck', duration: 310 },
+      { title: 'Holocene', artist: 'Bon Iver', duration: 345 },
+    ]
+  },
+  {
+    id: 'work', label: 'Deep Work', icon: '🎯',
+    start: 9, end: 17, color: '#6eb5f5',
+    mood: 'Focus · No lyrics', genre: 'Classical · Neoclassical · Lo-fi instrumental',
+    desc: 'Concentration without distraction',
+    tracks: [
+      { title: 'Gymnopédie No.1', artist: 'Erik Satie', duration: 198 },
+      { title: 'Experience', artist: 'Ludovico Einaudi', duration: 348 },
+      { title: 'Comptine d\'un autre été', artist: 'Yann Tiersen', duration: 155 },
+    ]
+  },
+  {
+    id: 'sunset', label: 'Sunset', icon: '🌇',
+    start: 17, end: 20, color: '#f07070',
+    mood: 'Vibey & warm', genre: 'R&B · Neo-soul · Indie pop',
+    desc: 'Transition into evening energy',
+    tracks: [
+      { title: 'Nights', artist: 'Frank Ocean', duration: 307 },
+      { title: 'Golden Hour', artist: 'JVKE', duration: 209 },
+      { title: 'Slow Burn', artist: 'Kacey Musgraves', duration: 231 },
+    ]
+  },
+  {
+    id: 'night', label: 'Night Wind-down', icon: '🌙',
+    start: 20, end: 30, color: '#a78bfa',
+    mood: 'Dreamy · Slow', genre: 'Ambient · Dream pop · Jazz',
+    desc: 'Ease into rest',
+    tracks: [
+      { title: 'Motion Picture Soundtrack', artist: 'Radiohead', duration: 286 },
+      { title: 'Intro', artist: 'The xx', duration: 133 },
+      { title: 'Re: Stacks', artist: 'Bon Iver', duration: 256 },
+    ]
+  },
+];
+
+function getCurrentSlot(hour) {
+  return TIME_SLOTS.find(s => hour >= s.start && hour < s.end) || TIME_SLOTS[3];
+}
+
+function fmtTime(sec) {
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function nowLabel(hour) {
+  if (hour < 12) return 'Morning';
+  if (hour < 17) return 'Afternoon';
+  if (hour < 20) return 'Evening';
+  return 'Night';
+}
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+function IPlay() {
+  return <svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M8 5v14l11-7z"/></svg>;
+}
+function IPause() {
+  return <svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>;
+}
+function ISkip() {
+  return <svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>;
+}
+function IBack() {
+  return <svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>;
+}
+
+// ─── Waveform ─────────────────────────────────────────────────────────────────
+function Waveform({ playing, count = 16, color = 'rgba(255,255,255,0.7)' }) {
+  return (
+    <div className="waveform">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className={`wv${playing ? ' active' : ''}`}
+          style={{ height: playing ? undefined : `${4 + (i % 4) * 2}px`,
+                   animationDelay: `${(i * 0.06).toFixed(2)}s`,
+                   background: playing ? color : 'rgba(255,255,255,0.2)' }} />
+      ))}
+    </div>
+  );
+}
+
+// ─── Now Playing Panel ────────────────────────────────────────────────────────
+function NowPlayingPanel({ slot, playing, setPlaying, trackIdx, setTrackIdx }) {
+  const [progress, setProgress] = React.useState(0);
+  const tracks = slot.tracks;
+  const track = tracks[trackIdx % tracks.length];
+
+  React.useEffect(() => {
+    if (!playing) return;
+    const iv = setInterval(() => {
+      setProgress(p => {
+        if (p >= 100) { setTrackIdx(i => (i + 1) % tracks.length); return 0; }
+        return p + (100 / track.duration) * 0.5;
+      });
+    }, 500);
+    return () => clearInterval(iv);
+  }, [playing, track.duration, tracks.length]);
+
+  const curSec = Math.round((progress / 100) * track.duration);
+  const artGradient = `linear-gradient(135deg, ${slot.color}55, ${slot.color}22)`;
+
+  return (
+    <div className="panel now-playing">
+      {/* Top row */}
+      <div className="np-top">
+        <div className="np-art" style={{ background: artGradient }}>
+          <div className={`np-art-vinyl${playing ? ' spinning' : ''}`}/>
+        </div>
+        <div className="np-info">
+          <div className="np-title">{track.title}</div>
+          <div className="np-artist">{track.artist}</div>
+        </div>
+        <div className="np-time-label" style={{ color: slot.color }}>{slot.icon} {slot.label}</div>
+      </div>
+
+      {/* Progress */}
+      <div className="np-progress">
+        <div className="np-bar-track"
+          onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setProgress(((e.clientX - r.left) / r.width) * 100); }}>
+          <div className="np-bar-fill"
+            style={{ width: progress + '%', background: `linear-gradient(90deg, ${slot.color}aa, ${slot.color})` }}/>
+        </div>
+        <div className="np-times">
+          <span>{fmtTime(curSec)}</span>
+          <span>{fmtTime(track.duration)}</span>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="np-controls">
+        <button className="ctrl-btn" onClick={() => { setTrackIdx(i => (i - 1 + tracks.length) % tracks.length); setProgress(0); }}>
+          <IBack/>
+        </button>
+        <button className="ctrl-play" onClick={() => setPlaying(p => !p)}
+          style={{ background: `linear-gradient(145deg, ${slot.color}dd, ${slot.color}88)` }}>
+          {playing ? <IPause/> : <IPlay/>}
+        </button>
+        <button className="ctrl-btn" onClick={() => { setTrackIdx(i => (i + 1) % tracks.length); setProgress(0); }}>
+          <ISkip/>
+        </button>
+        <div style={{ marginLeft: 8 }}>
+          <Waveform playing={playing} count={12} color={slot.color}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Day Arc Panel ────────────────────────────────────────────────────────────
+function DayArcPanel({ currentSlot, onSlotClick }) {
+  const now = new Date();
+  const hour = now.getHours() + now.getMinutes() / 60;
+  const dayStart = 6, dayEnd = 24;
+  const dayLen = dayEnd - dayStart;
+  const nowPct = Math.max(0, Math.min(100, ((hour - dayStart) / dayLen) * 100));
+
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+  const segWidths = TIME_SLOTS.map(s => {
+    const segStart = Math.max(s.start, dayStart);
+    const segEnd   = Math.min(s.end, dayEnd);
+    return Math.max(0, (segEnd - segStart) / dayLen) * 100;
+  });
+
+  return (
+    <div className="panel day-arc">
+      <div className="da-header">
+        <span className="da-title">Today's Arc</span>
+        <span className="da-date">{timeStr} · {dateStr}</span>
+      </div>
+
+      {/* Timeline bar */}
+      <div className="timeline">
+        <div className="tl-track">
+          {TIME_SLOTS.map((s, i) => (
+            <div key={s.id} className="tl-seg"
+              style={{
+                flex: segWidths[i], 
+                background: s.id === currentSlot.id
+                  ? `linear-gradient(90deg, ${s.color}99, ${s.color})`
+                  : `${s.color}30`,
+              }}/>
+          ))}
+        </div>
+        <div className="tl-now-marker" style={{ left: nowPct + '%' }}/>
+      </div>
+
+      {/* Slot list */}
+      <div className="slots">
+        {TIME_SLOTS.map(s => {
+          const isCurrent = s.id === currentSlot.id;
+          return (
+            <div key={s.id} className={`slot${isCurrent ? ' current' : ''}`}
+              onClick={() => onSlotClick(s)}>
+              <div className="slot-dot" style={{ background: s.color, color: s.color, width: isCurrent ? 10 : 7, height: isCurrent ? 10 : 7 }}/>
+              <div className="slot-time">{s.start > 12 ? s.start - 12 + (s.start >= 12 ? 'pm' : 'am') : s.start + (s.start >= 12 ? 'pm' : 'am')}</div>
+              <div className="slot-info">
+                <div className="slot-label" style={{ color: isCurrent ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.5)', fontSize: isCurrent ? 13 : 12 }}>
+                  {s.icon} {s.label}
+                </div>
+                <div className="slot-mood">{s.mood}</div>
+              </div>
+              {isCurrent && (
+                <span className="slot-badge" style={{ background: `${s.color}22`, color: s.color, border: `0.5px solid ${s.color}55` }}>
+                  NOW
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Calendar Notice ──────────────────────────────────────────────────────────
+function CalNotice({ connected, onConnect }) {
+  if (connected) return null;
+  return (
+    <div className="cal-notice">
+      <span className="cal-icon">📅</span>
+      <span className="cal-text">Connect your calendar so Claudio can plan your day automatically</span>
+      <span className="cal-link" onClick={onConnect}>Connect →</span>
+    </div>
+  );
+}
+
+// ─── Chat Panel ───────────────────────────────────────────────────────────────
+function ChatPanel({ slot }) {
+  const [open, setOpen] = React.useState(false);
+  const [messages, setMessages] = React.useState([
+    { role: 'dj', text: `Good ${nowLabel(new Date().getHours()).toLowerCase()}. It's ${slot.label.toLowerCase()} time — ${slot.desc.toLowerCase()}. I've got ${slot.genre.toLowerCase()} lined up.` }
+  ]);
+  const [input, setInput] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const msgsRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
+  }, [messages]);
+
+  async function send() {
+    if (!input.trim() || loading) return;
+    const txt = input.trim(); setInput('');
+    setMessages(m => [...m, { role: 'user', text: txt }]);
+    setLoading(true);
+    try {
+      const res = await window.claude.complete({
+        messages: [{ role: 'user', content: `You are Claudio, a warm intimate AI DJ widget on someone's Mac desktop. Current time slot: "${slot.label}" (${slot.mood}, playing ${slot.genre}). User says: "${txt}". Reply in 1-2 short sentences, like a knowledgeable late-night radio host. Conversational, slightly poetic. No emojis. No asterisks.` }]
+      });
+      setMessages(m => [...m, { role: 'dj', text: res }]);
+    } catch (e) {
+      setMessages(m => [...m, { role: 'dj', text: 'Lost signal for a moment…' }]);
+    }
+    setLoading(false);
+  }
+
+  if (!open) {
+    return (
+      <div className="chat-pill-wrap">
+        <button className="chat-pill-btn" onClick={() => setOpen(true)}>
+          <span className="chat-pill-icon">◎</span>
+          <span className="chat-pill-text">Ask Claudio something…</span>
+          <span className="chat-pill-hint">⌘K</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="panel" style={{ padding: '14px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)' }}>Claudio</span>
+        <button onClick={() => setOpen(false)} style={{ border: 'none', background: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 13 }}>✕</button>
+      </div>
+      <div className="chat-expanded">
+        <div ref={msgsRef} className="chat-msgs">
+          {messages.map((msg, i) => (
+            <div key={i} className={`cmsg ${msg.role}`}>{msg.text}</div>
+          ))}
+          {loading && (
+            <div className="typing-dots">
+              {[0, 1, 2].map(i => <div key={i} className="td" style={{ animationDelay: `${i * 0.15}s` }}/>)}
+            </div>
+          )}
+        </div>
+        <div className="chat-row">
+          <textarea className="chat-input-inner" placeholder="Ask or request…" value={input} rows={1}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}/>
+          <button className="send-btn" style={{ background: `linear-gradient(145deg, ${slot.color}dd, ${slot.color}88)` }} onClick={send}>↑</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+function App() {
+  const now = new Date();
+  const hour = now.getHours();
+
+  // Allow clicking a slot to preview it
+  const [activeSlot, setActiveSlot] = React.useState(() => getCurrentSlot(hour));
+  const [playing, setPlaying] = React.useState(false);
+  const [trackIdx, setTrackIdx] = React.useState(0);
+  const [calConnected, setCalConnected] = React.useState(false);
+
+  // When slot changes (by click), reset track
+  const handleSlotClick = (slot) => {
+    setActiveSlot(slot);
+    setTrackIdx(0);
+  };
+
+  const handleCalConnect = () => {
+    setCalConnected(true);
+    // In real app: OAuth to Google/Apple Calendar
+  };
+
+  return (
+    <div className="widget fadein">
+      {/* macOS titlebar */}
+      <div className="titlebar">
+        <div className="traffic-lights">
+          <div className="tl tl-close" title="Close">✕</div>
+          <div className="tl tl-min" title="Minimize">−</div>
+          <div className="tl tl-max" title="Fullscreen">+</div>
+        </div>
+        <div className="title-text">ClauDJ</div>
+      </div>
+
+      <div className="content">
+        {/* Calendar connection notice */}
+        <CalNotice connected={calConnected} onConnect={handleCalConnect}/>
+
+        {/* Now playing */}
+        <NowPlayingPanel
+          slot={activeSlot}
+          playing={playing} setPlaying={setPlaying}
+          trackIdx={trackIdx} setTrackIdx={setTrackIdx}
+        />
+
+        {/* Day arc */}
+        <DayArcPanel currentSlot={activeSlot} onSlotClick={handleSlotClick}/>
+
+        {/* Chat */}
+        <ChatPanel slot={activeSlot}/>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
